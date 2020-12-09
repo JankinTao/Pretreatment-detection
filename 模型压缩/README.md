@@ -11,7 +11,7 @@ scale参数默认0.001，根据数据集，mAP,BN分布调整，数据分布广�
 <br>
 `python train.py --cfg cfg/my_cfg.cfg --data data/my_data.data --weights weights/last.weights --epochs 300 --batch-size 32 -sr --s 0.001 --prune 1`
 
-#### 通道剪枝策略一
+#### 通道剪枝
 由于yolov3中有五组共23处shortcut连接，对应的是add操作。<br>
 <br>
 `python prune.py --cfg cfg/my_cfg.cfg --data data/my_data.data --weights weights/last.pt --percent 0.85`
@@ -23,7 +23,7 @@ scale参数默认0.001，根据数据集，mAP,BN分布调整，数据分布广�
 <br>
 `python layer_prune.py --cfg cfg/my_cfg.cfg --data data/my_data.data --weights weights/last.pt --shortcuts 12`
 
-#### 微调finetune
+#### 微调
 剪枝的效果好不好首先还是要看稀疏情况，而不同的剪枝策略和阈值设置在剪枝后的效果表现也不一样，有时剪枝后模型精度甚至可能上升，而一般而言剪枝会损害模型精度，这时候需要对剪枝后的模型进行微调，让精度回升。<br>
 <br>
 `python train.py --cfg cfg/prune_0.85_my_cfg.cfg --data data/my_data.data --weights weights/prune_0.85_last.weights --epochs 100 --batch-size 32`
