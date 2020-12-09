@@ -21,19 +21,6 @@ scale参数默认0.001，根据数据集，mAP,BN分布调整，数据分布广�
 注意：训练保存的pt权重包含epoch信息，可通过`python -c "from models import *; convert('cfg/yolov3.cfg', 'weights/last.pt')"`转换为darknet weights去除掉epoch信息，使用darknet weights从epoch 0开始稀疏训练。<br>
 <br>
 `python train.py --cfg cfg/my_cfg.cfg --data data/my_data.data --weights weights/last.weights --epochs 300 --batch-size 32 -sr --s 0.001 --prune 1`
-* ##### 稀疏策略一：恒定s
-这是一开始的策略，也是默认的策略。在整个稀疏过程中，始终以恒定的s给模型添加额外的梯度，因为力度比较均匀，往往压缩度较高。但稀疏过程是个博弈过程，我们不仅想要较高的压缩度，也想要在学习率下降后恢复足够的精度，不同的s最后稀疏结果也不同，想要找到合适的s往往需要较高的时间成本。<br>
-<br>
-`bn_module.weight.grad.data.add_(s * torch.sign(bn_module.weight.data))`
-* ##### 稀疏策略二：全局s衰减
-关键代码是下面这句，在epochs的0.5阶段s衰减100倍。前提是0.5之前权重已经完成大幅压缩，这时对s衰减有助于精度快速回升，但是相应的bn会出现一定膨胀，降低压缩度，有利有弊，可以说是牺牲较大的压缩度换取较高的精度，同时减少寻找s的时间成本。当然这个0.5和100可以自己调整。注意也不能为了在前半部分加快压缩bn而大大提高s，过大的s会导致模型精度下降厉害，且s衰减后也无法恢复。如果想使用这个策略，可以在prune_utils.py中的BNOptimizer把下面这句取消注释。<br>
-<br>
-`# s = s if epoch <= opt.epochs * 0.5 else s * 0.01`
-* ##### 稀疏策略三：局部s衰减
-关键代码是下面两句，在epochs的0.5阶段开始对85%的通道保持原力度压缩，15%的通道进行s衰减100倍。这个85%是个先验知识，是由策略一稀疏后尝试剪通道几乎不掉点的最大比例，几乎不掉点指的是相对稀疏后精度；如果微调后还是不及baseline，或者说达不到精度要求，就可以使用策略三进行局部s衰减，从中间开始重新稀疏，这可以在牺牲较小压缩度情况下提高较大精度。如果想使用这个策略可以在train.py中把下面这两句取消注释，并根据自己策略一情况把0.85改为自己的比例，还有0.5和100也是可调的。策略二和三不建议一起用，除非你想做组合策略。<br>
-<br>
-`#if opt.sr and opt.prune==1 and epoch > opt.epochs * 0.5:`<br>
-`#  idx2mask = get_mask2(model, prune_idx, 0.85)`
 
 #### 通道剪枝策略一
 策略源自[Lam1360/YOLOv3-model-pruning](https://github.com/Lam1360/YOLOv3-model-pruning)，这是一种保守的策略，因为yolov3中有五组共23处shortcut连接，对应的是add操作，通道剪枝后如何保证shortcut的两个输入维度一致，这是必须考虑的问题。而Lam1360/YOLOv3-model-pruning对shortcut直连的层不进行剪枝，避免了维度处理问题，但它同样实现了较高剪枝率，对模型参数的减小有很大帮助。虽然它剪枝率最低，但是它对剪枝各细节的处理非常优雅，后面的代码也较多参考了原始项目。在本项目中还更改了它的阈值规则，可以设置更高的剪枝阈值。<br>
